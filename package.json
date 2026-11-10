@@ -1,0 +1,23 @@
+{
+  "name": "codex-thinking-shell",
+  "version": "1.0.0",
+  "description": "Lightweight thinking shell projector & soft-wrap injector for native Codex Desktop",
+  "type": "module",
+  "bin": {
+    "codex-thinking-shell": "./bin/codex-thinking-shell",
+    "codex-thinking-shim": "./bin/codex-thinking-shim"
+  },
+  "scripts": {
+    "start": "node ./src/launcher.mjs",
+    "test": "node --test test/**/*.test.mjs"
+  },
+  "keywords": [
+    "codex",
+    "desktop",
+    "thinking",
+    "reasoning",
+    "deepseek"
+  ],
+  "author": "",
+  "license": "MIT"
+}
