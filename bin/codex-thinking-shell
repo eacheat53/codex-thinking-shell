@@ -1,2 +1,7 @@
 #!/usr/bin/env node
-import "../src/launcher.mjs";
+import { launchCodexThinkingDesktop } from "../src/launcher.mjs";
+
+launchCodexThinkingDesktop().catch((err) => {
+  console.error(`[codex-thinking-shell] Error: ${err.message}`);
+  process.exit(1);
+});
