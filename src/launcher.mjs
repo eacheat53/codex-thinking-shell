@@ -33,6 +33,9 @@ export function locateStockCodex() {
 }
 
 export async function launchCodexThinkingDesktop(argv = process.argv.slice(2)) {
+  const isDetach = argv.includes("--detach") || argv.includes("-d") || !process.stdout.isTTY;
+  const filteredArgs = argv.filter((a) => a !== "--detach" && a !== "-d");
+
   const desktopBinary = locateDesktopBinary();
   const stockCodex = locateStockCodex();
   const shimPath = path.resolve(__dirname, "../bin/codex-thinking-shim");
@@ -47,9 +50,10 @@ export async function launchCodexThinkingDesktop(argv = process.argv.slice(2)) {
       encoding: "utf8",
     }).trim();
     if (runningPids) {
-      console.log("[codex-thinking-shell] Closing existing Codex Desktop instance...");
+      if (process.stdout.isTTY) {
+        console.log("[codex-thinking-shell] Closing existing Codex Desktop instance...");
+      }
       execSync("pkill -TERM -f '/usr/lib/chatgpt/ChatGPT' || true");
-      // Give it up to 2 seconds to exit gracefully
       await new Promise((r) => setTimeout(r, 1000));
     }
   } catch {}
@@ -70,7 +74,7 @@ export async function launchCodexThinkingDesktop(argv = process.argv.slice(2)) {
   const desktopArgs = [
     `--remote-debugging-port=${debugPort}`,
     ...waylandArgs,
-    ...argv,
+    ...filteredArgs,
   ];
 
   const env = {
@@ -79,42 +83,64 @@ export async function launchCodexThinkingDesktop(argv = process.argv.slice(2)) {
     CODEX_STOCK_CLI_PATH: stockCodex,
   };
 
-  console.log(`[codex-thinking-shell] Starting Codex Desktop with Thinking Shell shim...`);
-  console.log(`[codex-thinking-shell] Desktop: ${desktopBinary}`);
-  console.log(`[codex-thinking-shell] Stock CLI: ${stockCodex}`);
-  console.log(`[codex-thinking-shell] Shim: ${shimPath}`);
+  if (process.stdout.isTTY) {
+    console.log(`[codex-thinking-shell] Starting Codex Desktop with Thinking Shell shim...`);
+    console.log(`[codex-thinking-shell] Desktop: ${desktopBinary}`);
+    console.log(`[codex-thinking-shell] Stock CLI: ${stockCodex}`);
+    console.log(`[codex-thinking-shell] Shim: ${shimPath}`);
+  }
 
   const desktopProcess = spawn(desktopBinary, desktopArgs, {
     env,
-    stdio: "inherit",
-    detached: false,
+    stdio: isDetach ? "ignore" : "inherit",
+    detached: true,
   });
 
   // Background injection of soft-wrap CSS via CDP
-  void injectThinkingSoftWrap(debugPort, 40, 400).then((success) => {
-    if (success) {
+  const injectionPromise = injectThinkingSoftWrap(debugPort, 40, 400).then((success) => {
+    if (success && process.stdout.isTTY) {
       console.log(`[codex-thinking-shell] Successfully injected soft-wrap styles into Codex Desktop.`);
-    } else {
+    } else if (!success && process.stdout.isTTY) {
       console.warn(`[codex-thinking-shell] CDP soft-wrap injection timed out. (Thinking shell will still work with default wrapping)`);
     }
+    return success;
   });
 
-  const forwardSignal = (sig) => {
+  // Ignore SIGHUP so terminal closure will NOT kill Codex Desktop
+  process.on("SIGHUP", () => {
+    // Intentionally no-op to allow Desktop to survive terminal exit
+  });
+
+  process.on("SIGINT", () => {
     try {
-      desktopProcess.kill(sig);
+      desktopProcess.kill("SIGINT");
     } catch {}
-  };
-  process.on("SIGINT", () => forwardSignal("SIGINT"));
-  process.on("SIGTERM", () => forwardSignal("SIGTERM"));
-  process.on("SIGHUP", () => forwardSignal("SIGHUP"));
+  });
+  process.on("SIGTERM", () => {
+    try {
+      desktopProcess.kill("SIGTERM");
+    } catch {}
+  });
 
   desktopProcess.on("exit", (code, signal) => {
-    if (signal) {
-      process.kill(process.pid, signal);
-    } else {
-      process.exit(code ?? 0);
+    if (!isDetach) {
+      if (signal) {
+        process.kill(process.pid, signal);
+      } else {
+        process.exit(code ?? 0);
+      }
     }
   });
+
+  if (isDetach) {
+    // Wait for CSS injection, then unref and exit parent process cleanly
+    await injectionPromise;
+    desktopProcess.unref();
+    if (process.stdout.isTTY) {
+      console.log(`[codex-thinking-shell] Desktop is running in background (PID: ${desktopProcess.pid}).`);
+    }
+    process.exit(0);
+  }
 
   return desktopProcess;
 }
