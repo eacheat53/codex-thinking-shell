@@ -1,10 +1,16 @@
 # Codex Thinking Shell
 
-针对官方原生 **Codex Desktop** 接入第三方开源 API Key（如各类开源服务提供的 DeepSeek-R1、GLM 等支持思维链的模型）打造的超轻量独立增强工具。
+针对官方原生 **Codex Desktop** 接入第三方开源 API Key（如各类开源服务提供的 DeepSeek-V4、GLM 等支持思维链的模型）打造的超轻量独立增强工具。
 
 在保证**原生官方订阅与功能 100% 兼容**的前提下，让原生 Codex 桌面客户端具备实时的 `$ thinking` 思维链折叠卡片展示能力与样式软换行支持。
 
 零第三方运行时依赖（Zero npm dependencies），全平台（Linux、macOS、Windows）基于 Node.js 原生能力运行。
+
+---
+
+## 效果演示
+
+![Codex Thinking Shell Demo](./assets/demo.png)
 
 ---
 
